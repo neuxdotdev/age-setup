@@ -43,14 +43,14 @@
 
 ## Features
 
-✨ **Simple API** — One function call generates a complete keypair  
-🔒 **Secure by Default** — Automatic memory zeroization on drop  
-✅ **Validated Keys** — Public keys guaranteed to start with "age1"  
-🛡️ **Privacy-First** — Secret keys redacted in `Display` output  
-📦 **Zero Config** — Works out of the box with sensible defaults  
-🧪 **Well-Tested** — Comprehensive test coverage across all modules  
-⚡ **Fast** — Built on the battle-tested `age` crate  
-📖 **Documented** — Full API documentation with examples
+**Simple API** — One function call generates a complete keypair  
+**Secure by Default** — Automatic memory zeroization on drop  
+**Validated Keys** — Public keys guaranteed to start with "age1"  
+️ **Privacy-First** — Secret keys redacted in `Display` output  
+**Zero Config** — Works out of the box with sensible defaults  
+**Well-Tested** — Comprehensive test coverage across all modules  
+**Fast** — Built on the battle-tested `age` crate  
+**Documented** — Full API documentation with examples
 
 ---
 
@@ -289,7 +289,7 @@ pub struct SecretKey { /* private fields */ }
 
 Exposes the raw secret key as a string.
 
-**⚠️ Security Warning:** Only use this when absolutely necessary, as it exposes the secret.
+**️Security Warning:** Only use this when absolutely necessary, as it exposes the secret.
 
 ```rust
 let secret_str = keypair.secret.expose();
@@ -508,12 +508,12 @@ cargo tarpaulin --out Html
 
 **Test Coverage:**
 
-- ✅ Keypair generation
-- ✅ Public key validation
-- ✅ Secret key zeroization
-- ✅ Display implementations
-- ✅ Error handling
-- ✅ Type conversions
+- Keypair generation
+- Public key validation
+- Secret key zeroization
+- Display implementations
+- Error handling
+- Type conversions
 
 ---
 
@@ -639,10 +639,10 @@ copies or substantial portions of the Software.
 
 Yes! The library:
 
-- ✅ Uses battle-tested dependencies (`age`, `zeroize`)
-- ✅ Has comprehensive test coverage
-- ✅ Follows Rust security best practices
-- ✅ Is actively maintained
+- Uses battle-tested dependencies (`age`, `zeroize`)
+- Has comprehensive test coverage
+- Follows Rust security best practices
+- Is actively maintained
 
 ### How do I save keys to disk?
 
@@ -685,4 +685,4 @@ tokio::task::spawn_blocking(|| {
 
 ---
 
-**Made with ❤️ by [neuxdotdev](https://github.com/neuxdotdev)**
+**Made with ️ by [neuxdotdev](https://github.com/neuxdotdev)**
