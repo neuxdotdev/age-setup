@@ -1,0 +1,20 @@
+[package]
+name = "age-setup"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "a rust library that creates X25519 key pairs and uses age as its foundation and is very easy to use"
+repository = "https://github.com/neuxdotdev/age-setup.git"
+
+[[bench]]
+name = "keygen"
+harness = false
+
+[dependencies]
+age = "0.11.3"
+rand = "0.8"
+thiserror = "2.0.18"
+zeroize = "1.8.2"
+
+[dev-dependencies]
+criterion = { version = "0.8", features = ["html_reports"] }
