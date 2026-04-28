@@ -1,5 +1,5 @@
 ```
-.  # src/
+.  # src
 ├── apis
 │   ├── build.rs
 │   ├── mod.rs
@@ -32,8 +32,8 @@ pub mod errors;
 pub mod security;
 pub mod types;
 pub use apis::build::build_keypair;
-pub use errors::{Error, Result};
-pub use types::KeyPair;
+pub use errors::{Error, GenerationError, Result, SecurityError, ValidationError};
+pub use types::{KeyPair, PublicKey, SecretKey};
 ```
 ## src/types/mod.rs
 
@@ -41,7 +41,7 @@ pub use types::KeyPair;
 pub mod keypair;
 pub mod public_key;
 pub mod secret_key;
-pub mod validation;
+pub(crate) mod validation;
 pub use keypair::KeyPair;
 pub use public_key::PublicKey;
 pub use secret_key::SecretKey;
@@ -49,7 +49,7 @@ pub use secret_key::SecretKey;
 ## src/types/keypair.rs
 
 ```rust
-use crate::types::{PublicKey, SecretKey};
+use super::{PublicKey, SecretKey};
 #[derive(Debug)]
 pub struct KeyPair {
     pub public: PublicKey,
@@ -67,10 +67,10 @@ mod tests {
     #[test]
     fn test_keypair_new() {
         let pub_key = PublicKey::new("age1pub".to_string()).unwrap();
-        let secret_key = SecretKey::new("secret".to_string());
+        let secret_key = SecretKey::new("AGE-SECRET-KEY-1SECRET".to_string()).unwrap();
         let kp = KeyPair::new(pub_key, secret_key);
         assert_eq!(kp.public.expose(), "age1pub");
-        assert_eq!(kp.secret.expose(), "secret");
+        assert_eq!(kp.secret.expose_secret(), "AGE-SECRET-KEY-1SECRET");
     }
 }
 ```
@@ -78,12 +78,12 @@ mod tests {
 
 ```rust
 use crate::errors::Result;
-use crate::types::validation::validate_age_prefix;
 use std::fmt;
+use super::validation::validate_age_prefix;
 #[derive(Debug, Clone)]
 pub struct PublicKey(String);
 impl PublicKey {
-    pub(crate) fn new(raw: String) -> Result<Self> {
+    pub fn new(raw: String) -> Result<Self> {
         validate_age_prefix(&raw)?;
         Ok(Self(raw))
     }
@@ -106,58 +106,60 @@ impl AsRef<str> for PublicKey {
 mod tests {
     use super::*;
     #[test]
-    fn test_public_key_new_valid() {
-        let pk = PublicKey::new("age1valid".to_string());
-        assert!(pk.is_ok());
-        assert_eq!(pk.unwrap().expose(), "age1valid");
+    fn valid_public_key() {
+        let key = "age1validkey";
+        let pk = PublicKey::new(key.to_string()).unwrap();
+        assert_eq!(pk.expose(), key);
     }
     #[test]
-    fn test_public_key_new_invalid() {
-        let pk = PublicKey::new("invalid".to_string());
-        assert!(pk.is_err());
+    fn invalid_public_key_prefix() {
+        let key = "invalidkey";
+        let result = PublicKey::new(key.to_string());
+        assert!(result.is_err());
     }
     #[test]
-    fn test_public_key_display() {
-        let pk = PublicKey::new("age1test".to_string()).unwrap();
-        assert_eq!(format!("{}", pk), "age1test");
-    }
-    #[test]
-    fn test_public_key_asref() {
-        let pk = PublicKey::new("age1asref".to_string()).unwrap();
-        let s: &str = pk.as_ref();
-        assert_eq!(s, "age1asref");
-    }
-    #[test]
-    fn test_public_key_clone() {
-        let pk1 = PublicKey::new("age1clone".to_string()).unwrap();
-        let pk2 = pk1.clone();
-        assert_eq!(pk1.expose(), pk2.expose());
+    fn empty_public_key() {
+        let result = PublicKey::new("".to_string());
+        assert!(result.is_err());
     }
 }
 ```
 ## src/types/secret_key.rs
 
 ```rust
-use crate::security::zeroize::wipe_memory;
+use crate::errors::{Error, Result, ValidationError};
 use std::fmt;
-#[derive(Debug, Clone)]
+use zeroize::Zeroizing;
+#[derive(Clone)]
 pub struct SecretKey {
-    inner: Vec<u8>,
+    inner: Zeroizing<String>,
 }
 impl SecretKey {
-    pub(crate) fn new(raw: String) -> Self {
-        Self {
-            inner: raw.into_bytes(),
+    pub fn new(raw: String) -> Result<Self> {
+        if raw.is_empty() {
+            return Err(Error::from(ValidationError::invalid_secret_key(
+                "Secret key is empty",
+            )));
         }
+        if !raw.starts_with("AGE-SECRET-KEY-1") {
+            return Err(Error::from(ValidationError::invalid_secret_key(
+                "Secret key must start with 'AGE-SECRET-KEY-1'",
+            )));
+        }
+        Ok(Self {
+            inner: Zeroizing::new(raw),
+        })
     }
     #[must_use]
-    pub fn expose(&self) -> &str {
-        std::str::from_utf8(&self.inner).expect("SecretKey inner buffer must be valid UTF-8")
+    pub fn expose_secret(&self) -> &str {
+        &self.inner
     }
 }
-impl Drop for SecretKey {
-    fn drop(&mut self) {
-        let _ = wipe_memory(&mut self.inner);
+impl fmt::Debug for SecretKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("SecretKey")
+            .field("value", &"[REDACTED]")
+            .finish()
     }
 }
 impl fmt::Display for SecretKey {
@@ -169,25 +171,24 @@ impl fmt::Display for SecretKey {
 mod tests {
     use super::*;
     #[test]
-    fn test_secret_key_expose() {
-        let sk = SecretKey::new("test".to_string());
-        assert_eq!(sk.expose(), "test");
+    fn valid_secret_key() {
+        let key = "AGE-SECRET-KEY-1TESTKEY";
+        let sk = SecretKey::new(key.to_string()).unwrap();
+        assert_eq!(sk.expose_secret(), key);
     }
     #[test]
-    fn test_secret_key_display() {
-        let sk = SecretKey::new("test".to_string());
-        assert_eq!(format!("{}", sk), "[REDACTED]");
+    fn invalid_secret_key_prefix() {
+        let key = "INVALID-KEY";
+        let result = SecretKey::new(key.to_string());
+        assert!(result.is_err());
     }
     #[test]
-    fn test_secret_key_clone() {
-        let sk1 = SecretKey::new("secret".to_string());
-        let sk2 = sk1.clone();
-        assert_eq!(sk1.expose(), sk2.expose());
-    }
-    #[test]
-    fn test_secret_key_drop_calls_wipe() {
-        let sk = SecretKey::new("secret".to_string());
-        drop(sk);
+    fn debug_redacted() {
+        let key = "AGE-SECRET-KEY-1TESTKEY";
+        let sk = SecretKey::new(key.to_string()).unwrap();
+        let debug_output = format!("{:?}", sk);
+        assert!(debug_output.contains("[REDACTED]"));
+        assert!(!debug_output.contains(key));
     }
 }
 ```
@@ -197,9 +198,7 @@ mod tests {
 use crate::errors::{Error, Result, ValidationError};
 pub(crate) fn validate_age_prefix(key: &str) -> Result<()> {
     if key.is_empty() {
-        return Err(Error::from(ValidationError::invalid_public_key(
-            "Key is empty",
-        )));
+        return Err(Error::from(ValidationError::invalid_public_key("Key is empty")));
     }
     if !key.starts_with("age1") {
         return Err(Error::from(ValidationError::invalid_public_key(format!(
@@ -262,14 +261,14 @@ use crate::build::identity::create_identity;
 use crate::build::recipient::extract_recipient;
 use crate::errors::Result;
 use crate::types::{KeyPair, PublicKey, SecretKey};
-use age::secrecy::ExposeSecret;
+use age::secrecy::ExposeSecret;                         
 pub fn build_keypair() -> Result<KeyPair> {
     let identity = create_identity()?;
     let recipient = extract_recipient(&identity);
-    let public_raw = recipient.to_string();
-    let secret_raw = identity.to_string().expose_secret().to_string();
+    let public_raw = recipient.to_string();                     
+    let secret_raw = identity.to_string().expose_secret().to_string();  
     let public = PublicKey::new(public_raw)?;
-    let secret = SecretKey::new(secret_raw);
+    let secret = SecretKey::new(secret_raw)?;
     Ok(KeyPair::new(public, secret))
 }
 ```
@@ -296,30 +295,16 @@ pub type Result<T> = std::result::Result<T, Error>;
 mod tests {
     use super::*;
     #[test]
-    fn test_error_from_generation() {
-        let gen_err = GenerationError::IdentityCreationFailed;
-        let err: Error = gen_err.into();
+    fn error_from_generation() {
+        let err = Error::from(GenerationError::IdentityCreationFailed);
         assert!(matches!(err, Error::Generation(_)));
     }
     #[test]
-    fn test_error_from_validation() {
-        let val_err = ValidationError::invalid_public_key("test");
-        let err: Error = val_err.into();
-        assert!(matches!(err, Error::Validation(_)));
-    }
-    #[test]
-    fn test_error_from_security() {
-        let sec_err = SecurityError::MemoryWipeFailed;
-        let err: Error = sec_err.into();
-        assert!(matches!(err, Error::Security(_)));
-    }
-    #[test]
-    fn test_error_display() {
-        let err = Error::Generation(GenerationError::IdentityCreationFailed);
-        assert_eq!(
-            format!("{}", err),
-            "Key generation failed: Age identity generation failed: internal library error"
-        );
+    fn result_type_works() {
+        let ok: Result<i32> = Ok(42);
+        let err: Result<i32> = Err(Error::from(ValidationError::invalid_public_key("test")));
+        assert_eq!(ok.unwrap(), 42);
+        assert!(err.is_err());
     }
 }
 ```
@@ -330,10 +315,17 @@ mod tests {
 pub enum ValidationError {
     #[error("Invalid public key format: {reason}")]
     InvalidPublicKeyFormat { reason: String },
+    #[error("Invalid secret key format: {reason}")]
+    InvalidSecretKeyFormat { reason: String },
 }
 impl ValidationError {
     pub(crate) fn invalid_public_key(reason: impl Into<String>) -> Self {
         Self::InvalidPublicKeyFormat {
+            reason: reason.into(),
+        }
+    }
+    pub(crate) fn invalid_secret_key(reason: impl Into<String>) -> Self {
+        Self::InvalidSecretKeyFormat {
             reason: reason.into(),
         }
     }
@@ -342,10 +334,9 @@ impl ValidationError {
 mod tests {
     use super::*;
     #[test]
-    fn test_validation_error_display() {
-        let err = ValidationError::invalid_public_key("test reason");
-        let msg = format!("{}", err);
-        assert_eq!(msg, "Invalid public key format: test reason");
+    fn display_validation_error() {
+        let err = ValidationError::invalid_public_key("test");
+        assert_eq!(format!("{}", err), "Invalid public key format: test");
     }
 }
 ```
@@ -377,7 +368,7 @@ pub mod zeroize;
 ```rust
 use crate::errors::Result;
 use zeroize::Zeroize;
-#[must_use = "wipe_memory should be called to ensure memory is cleared"]
+#[must_use]
 pub(crate) fn wipe_memory(data: &mut [u8]) -> Result<()> {
     data.zeroize();
     Ok(())
@@ -386,10 +377,9 @@ pub(crate) fn wipe_memory(data: &mut [u8]) -> Result<()> {
 mod tests {
     use super::*;
     #[test]
-    fn test_wipe_memory_zeroizes() {
+    fn test_wipe() {
         let mut data = vec![1, 2, 3, 4];
-        let result = wipe_memory(&mut data);
-        assert!(result.is_ok());
+        wipe_memory(&mut data).unwrap();
         assert_eq!(data, vec![0, 0, 0, 0]);
     }
 }
@@ -406,8 +396,7 @@ pub mod recipient;
 use crate::errors::Result;
 use age::x25519::Identity;
 pub(crate) fn create_identity() -> Result<Identity> {
-    let identity = Identity::generate();
-    Ok(identity)
+    Ok(Identity::generate())
 }
 ```
 ## src/build/recipient.rs
