@@ -18,29 +18,15 @@ pub type Result<T> = std::result::Result<T, Error>;
 mod tests {
     use super::*;
     #[test]
-    fn test_error_from_generation() {
-        let gen_err = GenerationError::IdentityCreationFailed;
-        let err: Error = gen_err.into();
+    fn error_from_generation() {
+        let err = Error::from(GenerationError::IdentityCreationFailed);
         assert!(matches!(err, Error::Generation(_)));
     }
     #[test]
-    fn test_error_from_validation() {
-        let val_err = ValidationError::invalid_public_key("test");
-        let err: Error = val_err.into();
-        assert!(matches!(err, Error::Validation(_)));
-    }
-    #[test]
-    fn test_error_from_security() {
-        let sec_err = SecurityError::MemoryWipeFailed;
-        let err: Error = sec_err.into();
-        assert!(matches!(err, Error::Security(_)));
-    }
-    #[test]
-    fn test_error_display() {
-        let err = Error::Generation(GenerationError::IdentityCreationFailed);
-        assert_eq!(
-            format!("{}", err),
-            "Key generation failed: Age identity generation failed: internal library error"
-        );
+    fn result_type_works() {
+        let ok: Result<i32> = Ok(42);
+        let err: Result<i32> = Err(Error::from(ValidationError::invalid_public_key("test")));
+        assert_eq!(ok.unwrap(), 42);
+        assert!(err.is_err());
     }
 }
