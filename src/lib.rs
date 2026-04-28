@@ -4,5 +4,5 @@ pub mod errors;
 pub mod security;
 pub mod types;
 pub use apis::build::build_keypair;
-pub use errors::{Error, Result};
-pub use types::KeyPair;
+pub use errors::{Error, GenerationError, Result, SecurityError, ValidationError};
+pub use types::{KeyPair, PublicKey, SecretKey};
