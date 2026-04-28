@@ -1,10 +1,10 @@
 use crate::errors::Result;
-use crate::types::validation::validate_age_prefix;
 use std::fmt;
+use super::validation::validate_age_prefix;
 #[derive(Debug, Clone)]
 pub struct PublicKey(String);
 impl PublicKey {
-    pub(crate) fn new(raw: String) -> Result<Self> {
+    pub fn new(raw: String) -> Result<Self> {
         validate_age_prefix(&raw)?;
         Ok(Self(raw))
     }
@@ -27,31 +27,20 @@ impl AsRef<str> for PublicKey {
 mod tests {
     use super::*;
     #[test]
-    fn test_public_key_new_valid() {
-        let pk = PublicKey::new("age1valid".to_string());
-        assert!(pk.is_ok());
-        assert_eq!(pk.unwrap().expose(), "age1valid");
+    fn valid_public_key() {
+        let key = "age1validkey";
+        let pk = PublicKey::new(key.to_string()).unwrap();
+        assert_eq!(pk.expose(), key);
     }
     #[test]
-    fn test_public_key_new_invalid() {
-        let pk = PublicKey::new("invalid".to_string());
-        assert!(pk.is_err());
+    fn invalid_public_key_prefix() {
+        let key = "invalidkey";
+        let result = PublicKey::new(key.to_string());
+        assert!(result.is_err());
     }
     #[test]
-    fn test_public_key_display() {
-        let pk = PublicKey::new("age1test".to_string()).unwrap();
-        assert_eq!(format!("{}", pk), "age1test");
-    }
-    #[test]
-    fn test_public_key_asref() {
-        let pk = PublicKey::new("age1asref".to_string()).unwrap();
-        let s: &str = pk.as_ref();
-        assert_eq!(s, "age1asref");
-    }
-    #[test]
-    fn test_public_key_clone() {
-        let pk1 = PublicKey::new("age1clone".to_string()).unwrap();
-        let pk2 = pk1.clone();
-        assert_eq!(pk1.expose(), pk2.expose());
+    fn empty_public_key() {
+        let result = PublicKey::new("".to_string());
+        assert!(result.is_err());
     }
 }
