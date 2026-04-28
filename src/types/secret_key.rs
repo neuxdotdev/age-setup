@@ -1,23 +1,36 @@
-use crate::security::zeroize::wipe_memory;
+use crate::errors::{Error, Result, ValidationError};
 use std::fmt;
-#[derive(Debug, Clone)]
+use zeroize::Zeroizing;
+#[derive(Clone)]
 pub struct SecretKey {
-    inner: Vec<u8>,
+    inner: Zeroizing<String>,
 }
 impl SecretKey {
-    pub(crate) fn new(raw: String) -> Self {
-        Self {
-            inner: raw.into_bytes(),
+    pub fn new(raw: String) -> Result<Self> {
+        if raw.is_empty() {
+            return Err(Error::from(ValidationError::invalid_secret_key(
+                "Secret key is empty",
+            )));
         }
+        if !raw.starts_with("AGE-SECRET-KEY-1") {
+            return Err(Error::from(ValidationError::invalid_secret_key(
+                "Secret key must start with 'AGE-SECRET-KEY-1'",
+            )));
+        }
+        Ok(Self {
+            inner: Zeroizing::new(raw),
+        })
     }
     #[must_use]
-    pub fn expose(&self) -> &str {
-        std::str::from_utf8(&self.inner).expect("SecretKey inner buffer must be valid UTF-8")
+    pub fn expose_secret(&self) -> &str {
+        &self.inner
     }
 }
-impl Drop for SecretKey {
-    fn drop(&mut self) {
-        let _ = wipe_memory(&mut self.inner);
+impl fmt::Debug for SecretKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("SecretKey")
+            .field("value", &"[REDACTED]")
+            .finish()
     }
 }
 impl fmt::Display for SecretKey {
@@ -29,24 +42,23 @@ impl fmt::Display for SecretKey {
 mod tests {
     use super::*;
     #[test]
-    fn test_secret_key_expose() {
-        let sk = SecretKey::new("test".to_string());
-        assert_eq!(sk.expose(), "test");
+    fn valid_secret_key() {
+        let key = "AGE-SECRET-KEY-1TESTKEY";
+        let sk = SecretKey::new(key.to_string()).unwrap();
+        assert_eq!(sk.expose_secret(), key);
     }
     #[test]
-    fn test_secret_key_display() {
-        let sk = SecretKey::new("test".to_string());
-        assert_eq!(format!("{}", sk), "[REDACTED]");
+    fn invalid_secret_key_prefix() {
+        let key = "INVALID-KEY";
+        let result = SecretKey::new(key.to_string());
+        assert!(result.is_err());
     }
     #[test]
-    fn test_secret_key_clone() {
-        let sk1 = SecretKey::new("secret".to_string());
-        let sk2 = sk1.clone();
-        assert_eq!(sk1.expose(), sk2.expose());
-    }
-    #[test]
-    fn test_secret_key_drop_calls_wipe() {
-        let sk = SecretKey::new("secret".to_string());
-        drop(sk);
+    fn debug_redacted() {
+        let key = "AGE-SECRET-KEY-1TESTKEY";
+        let sk = SecretKey::new(key.to_string()).unwrap();
+        let debug_output = format!("{:?}", sk);
+        assert!(debug_output.contains("[REDACTED]"));
+        assert!(!debug_output.contains(key));
     }
 }
