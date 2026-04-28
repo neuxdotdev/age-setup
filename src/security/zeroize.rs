@@ -1,6 +1,6 @@
 use crate::errors::Result;
 use zeroize::Zeroize;
-#[must_use = "wipe_memory should be called to ensure memory is cleared"]
+#[must_use]
 pub(crate) fn wipe_memory(data: &mut [u8]) -> Result<()> {
     data.zeroize();
     Ok(())
@@ -9,10 +9,9 @@ pub(crate) fn wipe_memory(data: &mut [u8]) -> Result<()> {
 mod tests {
     use super::*;
     #[test]
-    fn test_wipe_memory_zeroizes() {
+    fn test_wipe() {
         let mut data = vec![1, 2, 3, 4];
-        let result = wipe_memory(&mut data);
-        assert!(result.is_ok());
+        wipe_memory(&mut data).unwrap();
         assert_eq!(data, vec![0, 0, 0, 0]);
     }
 }
