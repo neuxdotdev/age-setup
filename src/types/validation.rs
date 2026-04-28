@@ -1,9 +1,7 @@
 use crate::errors::{Error, Result, ValidationError};
 pub(crate) fn validate_age_prefix(key: &str) -> Result<()> {
     if key.is_empty() {
-        return Err(Error::from(ValidationError::invalid_public_key(
-            "Key is empty",
-        )));
+        return Err(Error::from(ValidationError::invalid_public_key("Key is empty")));
     }
     if !key.starts_with("age1") {
         return Err(Error::from(ValidationError::invalid_public_key(format!(
