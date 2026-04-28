@@ -17,7 +17,6 @@ pub(crate) fn validate_age_prefix(key: &str) -> Result<()> {
 mod tests {
     use super::*;
     use crate::errors::Error;
-
     #[test]
     fn test_validate_age_prefix_empty() {
         let result = validate_age_prefix("");
@@ -30,7 +29,6 @@ mod tests {
             _ => panic!(),
         }
     }
-
     #[test]
     fn test_validate_age_prefix_wrong_prefix() {
         let result = validate_age_prefix("xyz123");
@@ -44,13 +42,11 @@ mod tests {
             _ => panic!(),
         }
     }
-
     #[test]
     fn test_validate_age_prefix_short_prefix() {
         let result = validate_age_prefix("age");
         assert!(result.is_err());
     }
-
     #[test]
     fn test_validate_age_prefix_valid() {
         let result = validate_age_prefix("age1abcdef");

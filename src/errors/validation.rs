@@ -13,7 +13,6 @@ impl ValidationError {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_validation_error_display() {
         let err = ValidationError::invalid_public_key("test reason");
