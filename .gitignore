@@ -2,3 +2,6 @@
 /vendor
 .env
 /dev
+a
+/tmp
+tmp.diff
