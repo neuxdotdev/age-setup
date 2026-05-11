@@ -24,7 +24,7 @@ fn test_secret_key_display_redacts_and_clone() {
     let kp = build_keypair().unwrap();
     let secret = kp.secret;
     assert_eq!(format!("{}", secret), "[REDACTED]");
-    let exposed = secret.expose_secret();          // fixed method name
+    let exposed = secret.expose_secret(); // fixed method name
     assert!(!exposed.is_empty());
     let secret2 = secret.clone();
     assert_eq!(secret.expose_secret(), secret2.expose_secret());
