@@ -43,14 +43,14 @@
 
 ## Features
 
-**Simple API** — One function call generates a complete keypair  
-**Secure by Default** — Automatic memory zeroization on drop  
-**Validated Keys** — Public keys guaranteed to start with "age1"  
-️ **Privacy-First** — Secret keys redacted in `Display` output  
-**Zero Config** — Works out of the box with sensible defaults  
-**Well-Tested** — Comprehensive test coverage across all modules  
-**Fast** — Built on the battle-tested `age` crate  
-**Documented** — Full API documentation with examples
+- **Simple API** — One function call generates a complete keypair
+- **Secure by Default** — Automatic memory zeroization on drop
+- **Validated Keys** — Public keys guaranteed to start with `"age1"`
+- **Privacy-First** — Secret keys redacted in `Display` output
+- **Zero Config** — Works out of the box with sensible defaults
+- **Well-Tested** — Comprehensive test coverage across all modules
+- **Fast** — Built on the battle-tested `age` crate
+- **Documented** — Full API documentation with examples
 
 ---
 
@@ -87,7 +87,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Secret key: {}", keypair.secret); // Prints: [REDACTED]
 
     // Access raw secret (use with caution!)
-    let secret_str = keypair.secret.expose();
+    let secret_str = keypair.secret.expose_secret();
 
     Ok(())
 }
@@ -111,7 +111,6 @@ let keypair = build_keypair().expect("failed to generate keypair");
 // Public key is validated and guaranteed to start with "age1"
 assert!(keypair.public.expose().starts_with("age1"));
 
-// Use the keys with age encryption
 println!("Share this public key: {}", keypair.public);
 ```
 
@@ -120,21 +119,18 @@ println!("Share this public key: {}", keypair.public);
 Handle different error types explicitly:
 
 ```rust
-use age_setup::{build_keypair, Error};
+use age_setup::{build_keypair, Error, GenerationError, ValidationError};
 
 match build_keypair() {
     Ok(keypair) => {
         println!("✓ Generated keypair successfully");
         println!("  Public: {}", keypair.public);
     }
-    Err(Error::Generation(e)) => {
-        eprintln!("✗ Key generation failed: {}", e);
+    Err(Error::Generation(GenerationError::IdentityCreationFailed)) => {
+        eprintln!("✗ Key generation failed (rare, entropy issue?)");
     }
     Err(Error::Validation(e)) => {
         eprintln!("✗ Key validation failed: {}", e);
-    }
-    Err(Error::Security(e)) => {
-        eprintln!("✗ Security operation failed: {}", e);
     }
 }
 ```
@@ -151,7 +147,7 @@ let public_str: &str = keypair.public.expose();
 let public_owned: String = keypair.public.to_string();
 
 // Secret key (handle with care!)
-let secret_str: &str = keypair.secret.expose();
+let secret_str: &str = keypair.secret.expose_secret();
 
 // Convert to AsRef<str> for compatibility
 fn print_key(key: &impl AsRef<str>) {
@@ -174,15 +170,14 @@ use std::io::Write;
 
 let keypair = build_keypair()?;
 
-// Encrypt a file with age
-let encrypted = age::encrypt(
-    &age::x25519::Recipient::from_str(keypair.public.expose())?,
-    plaintext.as_bytes(),
-)?;
+// age::encrypt expects a recipient; you'll need to convert the public key
+// with age::x25519::Recipient::from_str (but that's outside this crate)
+// This example is illustrative.
+let encrypted_data = "pretend_encrypted"; // real usage would call age::encrypt
 
 // Save the secret key securely
 let key_path = dirs::home_dir().unwrap().join(".age/key.txt");
-std::fs::write(&key_path, format!("# age identity\n{}", keypair.secret.expose()))?;
+std::fs::write(&key_path, format!("# age identity\n{}", keypair.secret.expose_secret()))?;
 
 // Set restrictive permissions (Unix only)
 #[cfg(unix)]
@@ -252,7 +247,7 @@ println!("Secret: {}", keypair.secret); // Prints: [REDACTED]
 An age public key, guaranteed to start with "age1".
 
 ```rust
-pub struct PublicKey(String);
+pub struct PublicKey(/* private */);
 ```
 
 **Methods:**
@@ -280,19 +275,19 @@ assert!(public_str.starts_with("age1"));
 An age secret key that securely wipes its memory when dropped.
 
 ```rust
-pub struct SecretKey { /* private fields */ }
+pub struct SecretKey(/* private */);
 ```
 
 **Methods:**
 
-##### `expose(&self) -> &str`
+##### `expose_secret(&self) -> &str`
 
 Exposes the raw secret key as a string.
 
-**️Security Warning:** Only use this when absolutely necessary, as it exposes the secret.
+⚠️ **Security Warning:** Only use this when absolutely necessary, as it exposes the secret.
 
 ```rust
-let secret_str = keypair.secret.expose();
+let secret_str = keypair.secret.expose_secret();
 // Use secret_str with caution!
 ```
 
@@ -315,7 +310,6 @@ Main error type for the crate.
 pub enum Error {
     Generation(GenerationError),
     Validation(ValidationError),
-    Security(SecurityError),
 }
 ```
 
@@ -323,7 +317,7 @@ pub enum Error {
 
 ##### `Error::Generation`
 
-Error during key generation (e.g., internal library failure).
+Error during key generation.
 
 ```rust
 pub enum GenerationError {
@@ -333,36 +327,27 @@ pub enum GenerationError {
 
 ##### `Error::Validation`
 
-Error validating public key format.
+Error validating public/secret key format.
 
 ```rust
 pub enum ValidationError {
     InvalidPublicKeyFormat { reason: String },
+    InvalidSecretKeyFormat { reason: String },
 }
 ```
 
 **Example:**
 
 ```rust
-use age_setup::types::PublicKey;
+use age_setup::PublicKey;
 
 let result = PublicKey::new("invalid_key".to_string());
 assert!(result.is_err()); // Does not start with "age1"
 ```
 
-##### `Error::Security`
-
-Error during security operations (e.g., memory wipe).
-
-```rust
-pub enum SecurityError {
-    MemoryWipeFailed,
-}
-```
-
 **All errors implement:**
 
-- `std::error::Error` — Standard error trait
+- `std::error::Error`
 - `Display` — Human-readable error messages
 - `Debug` — Detailed debug information
 
@@ -378,7 +363,7 @@ The `SecretKey` type automatically zeroes its memory when dropped, preventing se
 {
     let keypair = build_keypair()?;
     // Secret is stored in memory
-    let secret = keypair.secret.expose();
+    let secret = keypair.secret.expose_secret();
     // ... use secret ...
 } // <-- Memory is securely overwritten with zeros here
 ```
@@ -401,8 +386,8 @@ let keypair = build_keypair()?;
 println!("{}", keypair.secret);        // Prints: [REDACTED]
 println!("{:?}", keypair.secret);      // Prints: SecretKey { ... }
 
-// Only expose() shows the actual secret
-println!("{}", keypair.secret.expose()); // Prints actual key
+// Only expose_secret() shows the actual secret
+println!("{}", keypair.secret.expose_secret()); // Prints actual key
 ```
 
 This prevents accidental logging or display of sensitive material.
@@ -414,7 +399,7 @@ This prevents accidental logging or display of sensitive material.
 All public keys are validated to ensure they start with the "age1" prefix:
 
 ```rust
-use age_setup::types::PublicKey;
+use age_setup::PublicKey;
 
 // Valid key
 let valid = PublicKey::new("age1abcdef...".to_string())?;
@@ -430,6 +415,8 @@ assert!(invalid.is_err());
 - Must start with "age1"
 - Automatically applied during keypair generation
 
+> **Note:** The validation function `validate_age_prefix` is internal (`pub(crate)`) and not exposed to end users. It is used only inside `PublicKey::new`.
+
 ---
 
 ## Development
@@ -439,30 +426,18 @@ assert!(invalid.is_err());
 ```
 age-setup/
 ├── src/
-│   ├── apis/
-│   │   ├── build.rs          # Keypair building API
-│   │   └── mod.rs
-│   ├── build/
-│   │   ├── identity.rs       # Internal identity generation
-│   │   ├── recipient.rs      # Recipient extraction
-│   │   └── mod.rs
-│   ├── errors/
-│   │   ├── buildings.rs      # Generation errors
-│   │   ├── security.rs       # Security errors
-│   │   ├── validation.rs     # Validation errors
-│   │   └── mod.rs
-│   ├── security/
-│   │   ├── zeroize.rs        # Memory zeroization utilities
-│   │   └── mod.rs
-│   ├── types/
-│   │   ├── keypair.rs        # KeyPair structure
-│   │   ├── public_key.rs     # PublicKey type
-│   │   ├── secret_key.rs     # SecretKey type
-│   │   ├── validation.rs     # Validation logic
-│   │   └── mod.rs
-│   └── lib.rs                # Library entry point
+│   ├── errors.rs             # Error types (Error, GenerationError, ValidationError)
+│   ├── generator.rs          # Keypair generation (build_keypair)
+│   ├── keypair.rs            # KeyPair struct
+│   ├── lib.rs                # Public API re-exports
+│   ├── public_key.rs         # PublicKey type
+│   ├── secret_key.rs         # SecretKey type (with zeroization)
+│   ├── security.rs           # wipe_memory utility
+│   └── validation.rs         # Internal validate_age_prefix (pub(crate))
+├── tests/
+│   └── integration_test.rs   # Integration tests
 ├── benches/
-│   └── keygen.rs             # Benchmarks
+│   └── keygen.rs             # Benchmarks using Criterion
 ├── Cargo.toml
 └── README.md
 ```
@@ -500,7 +475,7 @@ cargo test
 cargo test -- --nocapture
 
 # Run tests for a specific module
-cargo test types::
+cargo test validation::
 
 # Run tests with coverage (requires cargo-tarpaulin)
 cargo tarpaulin --out Html
@@ -525,14 +500,14 @@ Performance benchmarks are available using Criterion:
 # Run benchmarks
 cargo bench
 
-# Run specific benchmark
+# Run specific benchmark (if multiple)
 cargo bench keygen
 
 # Generate benchmark report
 cargo bench -- --save-baseline main
 ```
 
-**Benchmark Results** (example on Apple M1):
+**Example Benchmark Results** (Apple M1):
 
 ```
 keygen/build_keypair   time:   [45.2 µs 45.8 µs 46.5 µs]
@@ -582,7 +557,7 @@ Contributions are welcome! Here's how you can help:
 
 ### Code of Conduct
 
-Please be respectful and constructive in all interactions. We're here to build great software together.
+Please be respectful and constructive in all interactions. We're here to build great software together. See [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
 
 ---
 
@@ -656,7 +631,7 @@ let keypair = build_keypair()?;
 fs::write("key.pub", keypair.public.expose())?;
 
 // Save secret key (with proper permissions!)
-let secret_content = format!("# age identity\n{}", keypair.secret.expose());
+let secret_content = format!("# age identity\n{}", keypair.secret.expose_secret());
 fs::write("key.txt", secret_content)?;
 
 #[cfg(unix)]
@@ -668,7 +643,7 @@ fs::write("key.txt", secret_content)?;
 
 ### Can I use this with async code?
 
-Yes! Key generation is CPU-bound and very fast (~45µs), so you can call it directly:
+Yes! Key generation is CPU-bound and very fast (~45µs), so you can call it directly or use `spawn_blocking`:
 
 ```rust
 tokio::task::spawn_blocking(|| {
@@ -685,4 +660,4 @@ tokio::task::spawn_blocking(|| {
 
 ---
 
-**Made with ️ by [neuxdotdev](https://github.com/neuxdotdev)**
+**Made with ❤️ by [neuxdotdev](https://github.com/neuxdotdev)**
