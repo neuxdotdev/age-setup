@@ -1,6 +1,6 @@
 [package]
 name = "age-setup"
-version = "0.2.1"
+version = "0.3.0"
 edition = "2021"
 license = "MIT"
 description = "a rust library that creates X25519 key pairs and uses age as its foundation and is very easy to use"
@@ -12,8 +12,10 @@ harness = false
 
 [dependencies]
 age = "0.11.3"
+neuxcfg = "0.3.1"
 rand = "0.8"
 thiserror = "2.0.18"
+toml = "1.1.2"
 zeroize = "1.8.2"
 
 [dev-dependencies]
