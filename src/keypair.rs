@@ -1,62 +1,61 @@
-//! Age key pair.
-//!
-//! This module defines the [`KeyPair`] type, which bundles a validated
-//! [`PublicKey`] with its corresponding [`SecretKey`]. Key pairs are created
-//! via the [`build_keypair`](crate::build_keypair) function, which handles
-//! generation and validation, ensuring that the two keys are mathematically
-//! related and conform to the age specification.
-
 use crate::public_key::PublicKey;
 use crate::secret_key::SecretKey;
 
-/// An age X25519 key pair consisting of a public key and a secret key.
+/// A cryptographic key pair for the age protocol.
 ///
-/// `KeyPair` is the central type of this crate. It is produced by
-/// [`build_keypair`](crate::build_keypair) and provides access to both the
-/// public identity (safe to share) and the secret identity (must be kept
-/// confidential).
+/// Contains a [`PublicKey`] and a [`SecretKey`], both guaranteed to be valid
+/// age keys. The [`Debug`] implementation redacts the secret key value while
+/// displaying the public key in full.
 ///
-/// # Fields
+/// # Obtaining a KeyPair
 ///
-/// * `public: PublicKey` – The public key. It is guaranteed to start with
-///   `"age1"` and can be safely displayed, cloned, and shared.
-/// * `secret: SecretKey` – The secret key. It is automatically zeroized when
-///   dropped, and its `Display` and `Debug` implementations redact the actual
-///   key material.
+/// Use [`build_keypair`](crate::build_keypair) to generate a fresh key pair:
 ///
-/// # Creation
+/// ```no_run
+/// use age_setup::build_keypair;
 ///
-/// `KeyPair` cannot be constructed directly from outside the crate because
-/// its constructor is `pub(crate)`. This ensures that all key pairs are
-/// produced by [`build_keypair`], which properly generates a fresh identity
-/// and validates both keys.
+/// let kp = build_keypair()?;
+/// println!("Public: {}", kp.public);
+/// # Ok::<(), age_setup::Error>(())
+/// ```
 ///
-/// # Examples
+/// # Debug Safety
+///
+/// The debug representation does **not** leak the secret key:
 ///
 /// ```rust
 /// use age_setup::build_keypair;
 ///
 /// let kp = build_keypair()?;
-/// println!("Public key: {}", kp.public);
-/// // Secret key is redacted when printed:
-/// println!("Secret key: {}", kp.secret);   // prints [REDACTED]
+/// let debug_str = format!("{:?}", kp);
+/// assert!(debug_str.contains(kp.public.expose()));
+/// assert!(!debug_str.contains(kp.secret.expose_secret()));
 /// # Ok::<(), age_setup::Error>(())
 /// ```
+///
+/// # See Also
+///
+/// * [`build_keypair`](crate::build_keypair) – Generates a new `KeyPair`.
+/// * [`SecretKey`](crate::SecretKey) – Zeroizing secret key wrapper.
+/// * [`PublicKey`](crate::PublicKey) – Validated public key wrapper.
 #[derive(Debug)]
 pub struct KeyPair {
-    /// The public half of the key pair.
+    /// The public key component.
     pub public: PublicKey,
-    /// The secret half of the key pair (zeroized on drop).
+    /// The secret key component (redacted in debug output).
     pub secret: SecretKey,
 }
 
 impl KeyPair {
-    /// Creates a new `KeyPair` from an already validated public and secret key.
+    /// Creates a new `KeyPair` from existing keys.
     ///
-    /// This constructor is `pub(crate)` – only accessible within the crate.
-    /// External users obtain a `KeyPair` exclusively through
-    /// [`build_keypair`](crate::build_keypair), which performs the necessary
-    /// generation and validation steps.
+    /// This constructor is crate-internal. External users should call
+    /// [`build_keypair`](crate::build_keypair) to generate a new pair.
+    ///
+    /// # Parameters
+    ///
+    /// * `public` – A validated [`PublicKey`].
+    /// * `secret` – A validated [`SecretKey`].
     pub(crate) fn new(public: PublicKey, secret: SecretKey) -> Self {
         Self { public, secret }
     }
@@ -66,8 +65,6 @@ impl KeyPair {
 mod tests {
     use crate::build_keypair;
 
-    /// Verifies that a freshly generated key pair has fields that are
-    /// accessible and conform to the expected format.
     #[test]
     fn generated_keypair_fields_are_valid() {
         let kp = build_keypair().unwrap();
@@ -75,8 +72,6 @@ mod tests {
         assert!(kp.secret.expose_secret().starts_with("AGE-SECRET-KEY-1"));
     }
 
-    /// Ensures that the public and secret keys of a newly generated
-    /// `KeyPair` are non‑empty.
     #[test]
     fn generated_keypair_fields_are_non_empty() {
         let kp = build_keypair().unwrap();
@@ -84,17 +79,12 @@ mod tests {
         assert!(!kp.secret.expose_secret().is_empty());
     }
 
-    /// The `Debug` representation of a `KeyPair` must not expose the
-    /// secret key (it should be redacted by `SecretKey`'s `Debug` impl).
     #[test]
     fn debug_does_not_leak_secret() {
         let kp = build_keypair().unwrap();
         let debug_str = format!("{:?}", kp);
-        // The debug output should contain the public key (it is safe) ...
         assert!(debug_str.contains(kp.public.expose()));
-        // ... but NOT the raw secret key material.
         assert!(!debug_str.contains(kp.secret.expose_secret()));
-        // It should mention the redacted marker instead.
         assert!(debug_str.contains("[REDACTED]"));
     }
 }
