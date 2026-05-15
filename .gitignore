@@ -1,7 +1,6 @@
 /target
-/vendor
-.env
-/dev
+/dev/
+tmp.diff
 a
 /tmp
-tmp.diff
+a.md
