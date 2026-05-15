@@ -1,47 +1,39 @@
-//! Memory security utilities.
-//!
-//! This module provides functions for securely erasing sensitive data from memory,
-//! ensuring that secrets are not left behind after use. It wraps the [`zeroize`]
-//! crate to guarantee that overwrites are not optimized away by the compiler.
-
 use zeroize::Zeroize;
 
-/// Overwrites a byte buffer with zeros, preventing sensitive data from lingering
-/// in memory.
+/// Overwrites a byte buffer with zeros in a way that cannot be optimized away.
 ///
-/// This is a thin wrapper around the [`Zeroize`] trait from the `zeroize` crate.
-/// It guarantees that the memory will be cleared even if the compiler would
-/// otherwise optimize away a simple assignment (e.g., a `memset` call that appears
-/// dead).
+/// Uses the [`Zeroize`] trait from the `zeroize` crate to guarantee that the
+/// memory is cleared even in release builds. This is essential for securely
+/// erasing sensitive material such as secret keys from memory.
 ///
-/// # Why is this important?
+/// # Parameters
 ///
-/// When secret keys, passwords, or other sensitive data are no longer needed, they
-/// should be explicitly erased from memory. Otherwise, they might remain in
-/// freed memory pages, swap space, or core dumps, where they could be recovered
-/// by an attacker.
+/// * `data` – A mutable byte slice whose contents will be zeroized.
 ///
-/// # Example
+/// # Examples
 ///
 /// ```rust
 /// use age_setup::security::wipe_memory;
 ///
-/// let mut secret = vec![0x41, 0x42, 0x43]; // "ABC"
+/// let mut secret = vec![1, 2, 3, 4];
 /// wipe_memory(&mut secret);
-/// assert_eq!(secret, vec![0, 0, 0]);
+/// assert_eq!(secret, vec![0, 0, 0, 0]);
 /// ```
 ///
-/// # How it works
+/// Empty buffers are handled gracefully:
 ///
-/// The `zeroize` crate implements the [`Zeroize`] trait for `u8` slices. When
-/// called, it writes zeros to every element, using a volatile write to prevent
-/// the compiler from optimizing the operation away. After this function returns,
-/// the original data is irreversibly gone from that mutable slice.
+/// ```rust
+/// use age_setup::security::wipe_memory;
 ///
-/// # Safety
+/// let mut empty: Vec<u8> = vec![];
+/// wipe_memory(&mut empty);
+/// assert_eq!(empty, vec![]);
+/// ```
 ///
-/// This function is memory‑safe. It operates on a mutable reference and does not
-/// read or write beyond the bounds of the slice. It never panics.
+/// # See Also
+///
+/// * [`SecretKey`](crate::SecretKey) – Uses `Zeroizing` for automatic cleanup.
+/// * [`zeroize`](https://docs.rs/zeroize) – The underlying crate.
 pub fn wipe_memory(data: &mut [u8]) {
     data.zeroize();
 }
